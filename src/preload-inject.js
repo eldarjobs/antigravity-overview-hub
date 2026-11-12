@@ -1,7 +1,7 @@
 
 // ---- AG_EXTENSION_HUB (renderer) --------------------------------------------
 function installAntigravityExtensionHub() {
-    let state = { servers: [], skills: [] };
+    let state = { servers: [], skills: [], actions: [], customPrompts: [] };
     let usage = null;
     let rules = [];
     let history = [];
@@ -70,8 +70,9 @@ function installAntigravityExtensionHub() {
         </div>`;
 
     function renderKey() {
-        return JSON.stringify([state.servers.map(s => [s.id, s.enabled, s.toolCount, s.parked, s.readonly]), state.restartPending, state.skills.length,
-            state.meta, usage && usage.pct, expanded, open, rules.map(r => [r.name, r.enabled]), history.map(h => [h.id, h.peak])]);
+        return JSON.stringify([state.servers.map(s => [s.id, s.enabled, s.toolCount, s.parked, s.readonly]), state.restartPending,
+            state.skills.length, state.actions, state.customPrompts, state.meta, usage && usage.pct, expanded, open,
+            rules.map(r => [r.name, r.enabled]), history.map(h => [h.id, h.peak])]);
     }
 
     function mcpBody() {
@@ -99,22 +100,25 @@ function installAntigravityExtensionHub() {
     }
 
     function cliBody() {
-        const cmds = [['menu', 'Menu'], ['sync', 'Sync'], ['test', 'Deploy Test'], ['logs', 'Logs'], ['stats', 'Stats'], ['backup', 'Backup Test DB'], ['ssh', 'SSH'], ['archTests', 'Arch Tests'], ['graphUpdate', 'Update Graph']];
-        return `<div style="display:flex;flex-wrap:wrap;gap:4px;">${cmds.map(([key, label]) =>
-            `<button class="ag-cli" data-cmd="${key}" style="${key === 'test' ? S.btn : S.ghost}" title="${key === 'archTests' ? 'Run SkyChef architecture ratchet tests' : key === 'graphUpdate' ? 'Rebuild graphify-out/graph.json' : 'skychef.ps1 ' + (key === 'menu' ? '' : key)}">${label}</button>`).join('')}</div>`;
+        const actions = state.actions || [];
+        if (!actions.length) return `<span style="${S.muted}">No scripts detected. Add package.json scripts or .agents/hub.json.</span>`;
+        return `<div style="display:flex;flex-wrap:wrap;gap:4px;">${actions.map(a =>
+            `<button class="ag-cli" data-cmd="${esc(a.cmd)}" data-confirm="${a.confirm ? '1' : ''}" style="${a.primary ? S.btn : S.ghost}" title="${esc(a.cmd)}">${esc(a.label)}</button>`).join('')}</div>`;
     }
 
     function promptsBody() {
-        const list = [
-            ['CQRS Feature', 'Use the skychef-cqrs-feature skill and implement a new CQRS command/query in '],
-            ['Master Page', 'Use the skychef-master-page skill to create/refactor the master page for '],
-            ['Detail Page', 'Use the skychef-detail-page skill to create/refactor the detail page for '],
-            ['EF Migration', 'Use the skychef-ef-migrations skill to add and verify an EF Core migration for '],
-            ['Review Diff', 'Review the current uncommitted git diff for correctness, cross-module boundaries, time/date rules, and zero-emoji compliance.'],
-            ['Commit Msg', 'Inspect git status and staged/unstaged diff, then write a concise Conventional Commit message.'],
+        const defaults = [
+            ['Explain Codebase', 'Map out the architecture, entry points, and data flow of this repository.'],
+            ['Review Diff', 'Review the current uncommitted git diff for bugs, edge cases, and security issues.'],
+            ['Write Tests', 'Write unit/integration tests covering happy paths and edge cases for the recent changes.'],
+            ['Refactor', 'Refactor the selected code for clarity and reduced duplication without changing behaviour.'],
+            ['Fix Build / Lint', 'Run the build and linter, inspect any failures, and fix them cleanly.'],
+            ['Commit Msg', 'Inspect git status and diff, then draft a concise Conventional Commit message.'],
         ];
+        const custom = (state.customPrompts || []).map(p => [p.label, p.text]);
+        const list = [...custom, ...defaults];
         return `<div style="display:flex;flex-wrap:wrap;gap:4px;">${list.map(([label, text]) =>
-            `<button class="ag-prompt" data-text="${esc(text)}" style="${S.ghost}" title="${esc(text)}">${label}</button>`).join('')}</div>`;
+            `<button class="ag-prompt" data-text="${esc(text)}" style="${S.ghost}" title="${esc(text)}">${esc(label)}</button>`).join('')}</div>`;
     }
 
     function rulesBody() {
@@ -183,16 +187,17 @@ function installAntigravityExtensionHub() {
             const rulesOn = rules.filter(r => r.enabled).length;
             const projectSkills = state.skills.filter(s => s.scope === 'project').length;
             const m = state.meta || {};
-            const graphLabel = m.graphAgeHours == null ? 'no graph' : m.graphAgeHours >= 48 ? `graph ${Math.round(m.graphAgeHours / 24)}d` : `graph ${m.graphAgeHours}h`;
-            const metaBar = m.branch ? `
+            const graphChip = m.graphAgeHours != null ? `<span style="color:${m.graphAgeHours > 72 ? '#f59e0b' : '#71717a'};">${m.graphAgeHours >= 48 ? `graph ${Math.round(m.graphAgeHours / 24)}d` : `graph ${m.graphAgeHours}h`}</span>` : '';
+            const wsTitle = `${m.name || 'Workspace'}${m.branch ? ` @ ${m.branch}` : ''}${m.dirtyCount ? ` (${m.dirtyCount} chg)` : ''}`;
+            const metaBar = `
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:4px;font-size:10px;color:#a1a1aa;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:5px;padding:3px 6px;">
-                    <span style="font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.branch)}${m.dirtyCount ? ` (${m.dirtyCount} chg)` : ''}</span>
+                    <span id="ag-pick-ws" title="${esc(state.workspace || '')} - click to switch workspace" style="font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;">${esc(wsTitle)}</span>
                     <div style="display:flex;gap:4px;align-items:center;flex:none;">
-                        <span style="color:${m.graphAgeHours != null && m.graphAgeHours > 72 ? '#f59e0b' : '#71717a'};">${graphLabel}</span>
+                        ${graphChip}
                         <button id="ag-open-hooks" style="${S.ghost};color:${m.hooksActive ? '#34d399' : '#71717a'};" title="Open .agents/hooks.json">${m.hooksActive ? 'Hooks ON' : 'No Hooks'}</button>
-                        <button id="ag-open-agents" style="${S.ghost}" title="Open AGENTS.md">Map</button>
+                        ${m.mapFile ? `<button id="ag-open-agents" style="${S.ghost}" title="Open ${esc(m.mapFile)}">Map</button>` : ''}
                     </div>
-                </div>` : '';
+                </div>`;
 
             hub.innerHTML = `
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
@@ -206,7 +211,7 @@ function installAntigravityExtensionHub() {
                 ${S.div}${usageHtml}
                 ${section('mcp', 'MCP SERVERS', `<span style="font-size:10px;color:${active ? '#10b981' : '#71717a'};font-weight:600;">${active}/${state.servers.length} active</span><button id="ag-open-mcp" style="${S.ghost}">Config</button>`, mcpBody())}
                 ${S.div}
-                ${section('cli', 'SKYCHEF CLI', '', cliBody())}
+                ${section('cli', 'PROJECT ACTIONS', '', cliBody())}
                 ${S.div}
                 ${section('prompts', 'QUICK PROMPTS', '', promptsBody())}
                 ${S.div}
@@ -225,6 +230,7 @@ function installAntigravityExtensionHub() {
             const on = (sel, fn) => hub.querySelectorAll(sel).forEach(el => { el.onclick = (e) => fn(el, e); });
             on('#ag-compact', (b) => { b.textContent = 'Sent'; sendPrompt('/compact'); setTimeout(() => { b.textContent = 'Run /compact'; }, 1200); });
             on('#ag-refresh', () => sync(true));
+            on('#ag-pick-ws', async () => { state = await invoke('antigravity:pick-workspace') || state; sync(true); });
             on('#ag-open-mcp', () => invoke('antigravity:open-path', 'mcpConfig'));
             on('#ag-open-rules', () => invoke('antigravity:open-path', 'rulesDir'));
             on('#ag-open-hooks', () => invoke('antigravity:open-path', 'hooksFile'));
@@ -234,12 +240,6 @@ function installAntigravityExtensionHub() {
             on('.ag-ro', async (el) => {
                 try { state = await invoke('antigravity:toggle-readonly', { id: el.dataset.id }) || state; } catch {}
                 render(true);
-            });
-            on('.ag-prompt', (el) => {
-                const input = document.querySelector('textarea, [contenteditable="true"]');
-                if (!input) return;
-                input.focus();
-                document.execCommand('insertText', false, el.dataset.text || '');
             });
             on('.ag-tgl', async (el) => {
                 const srv = state.servers.find(s => s.id === el.dataset.id);
@@ -261,11 +261,17 @@ function installAntigravityExtensionHub() {
             });
             on('.ag-cli', async (el) => {
                 const cmd = el.dataset.cmd;
-                if (cmd === 'test' && !window.confirm('Deploy the current branch to the TEST environment?')) return;
+                if (el.dataset.confirm && !window.confirm(`Run "${cmd}" in ${state.workspace}?`)) return;
                 const label = el.textContent;
                 el.textContent = 'Opening';
                 await invoke('antigravity:run-cli', cmd);
                 setTimeout(() => { el.textContent = label; }, 1200);
+            });
+            on('.ag-prompt', (el) => {
+                const input = document.querySelector('textarea, [contenteditable="true"]');
+                if (!input) return;
+                input.focus();
+                document.execCommand('insertText', false, el.dataset.text || '');
             });
             on('.ag-skill', (el) => {
                 const input = document.querySelector('textarea, [contenteditable="true"]');

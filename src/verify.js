@@ -2,8 +2,13 @@
 // Verifies the built archive: syntax of patched files, and byte equality of all untouched entries.
 const path = require('path');
 const { readArchive, readEntry } = require('./asar');
+const { findResourcesDir } = require('./paths');
+
+const resDir = findResourcesDir();
+if (!resDir) { console.error('[ERROR] Antigravity resources directory not found.'); process.exit(1); }
+
 const a = readArchive(path.join(__dirname, '..', 'app.asar'));
-const o = readArchive(path.join(process.env.LOCALAPPDATA, 'Programs', 'Antigravity', 'resources', 'app.asar.bak'));
+const o = readArchive(path.join(resDir, 'app.asar.bak'));
 new Function('require', 'exports', 'module', '__dirname', '__filename', readEntry(a, 'dist/ipcHandlers.js').toString());
 new Function('require', 'exports', 'module', readEntry(a, 'dist/preload.js').toString());
 let bad = 0, checked = 0;

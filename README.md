@@ -1,46 +1,133 @@
-# Antigravity Overview Hub Patch
+# Antigravity Overview Hub
 
-> **Documentation status:** Active
-> **Last verified:** 2026-11-12 (Asia/Baku)
+A dependency-free, version-safe enhancement patch for the **Antigravity** desktop application. It turns the Overview menu into a project control center with auto-discovered MCP server management, context and token analytics, rules and skills browsing, and auto-detected project actions.
 
-Patch for the Antigravity desktop application that adds an Overview hub with quick actions, auto-discovered MCP server toggles, context usage and skill discovery.
+Because the patch builds dynamically from your **currently installed** `app.asar` (never shipping or overwriting with stale binaries), it never downgrades Antigravity and adapts cleanly across updates.
+
+---
 
 ## Features
 
-1. **Actions**: `Run /compact` and `Refresh` (rescan servers and skills).
-2. **Context usage bar**: tokens used by the latest conversation (green below 60%, amber below 80%, red above).
-3. **Auto-discovered MCP servers**:
-   - Read from `~/.gemini/config/mcp_config.json` (plus `antigravity` and `antigravity-ide` configs) and the loaded tool schema folders under `~/.gemini/antigravity/mcp/`. Nothing is hard-coded; new servers appear automatically and default to enabled, removed servers disappear.
-   - Status dot: green = enabled and tools loaded, amber = enabled but no tool schemas found, grey = disabled.
-   - Click a server name to list its tools. `Config` opens `mcp_config.json`.
-   - Toggles are stored in `~/.gemini/config/mcp_toggles.json` and written to `.agents/rules/00-active-mcps.md` (active servers with their tool lists, plus the disabled ones the agent must not use).
-4. **Skills**: project, global and plugin skills (folders containing `SKILL.md`), colour-coded by scope, with a filter box. Click a skill to insert `Use the <skill> skill.` into the prompt.
-5. **Real MCP disable & RO/RW toggle**: for servers defined in an `mcp_config.json`, switching off moves the definition into `~/.gemini/config/mcp_disabled.json` and switching on restores it, so a disabled server is not loaded and costs no context. Servers with `env.READONLY` (such as `mssql`) display an `RO`/`RW` button to switch between read-only and read-write modes. A banner asks for an Antigravity restart after a change. Plugin-provided servers are marked `rule only` (the switch only changes the rule file).
-6. **Rules panel**: lists `.agents/rules/*.md` with their trigger (`ALWAYS`, `COND`); switching off renames the file to `*.md.disabled`. `00-active-mcps.md` is managed by the hub and not listed.
-7. **SkyChef CLI & Workspace Strip**: status bar showing the git branch, uncommitted change count, `graphify` graph age, and shortcuts to `.agents/hooks.json` and `AGENTS.md`. Action buttons open `skychef.ps1` (`Menu`, `Sync`, `Deploy Test`, `Logs`, `Stats`, `Backup Test DB`, `SSH`), run architecture ratchet tests (`Arch Tests`), or update the knowledge graph (`Update Graph`). Production commands are intentionally excluded.
-8. **Quick Prompts**: one-click SkyChef prompt starters (`CQRS Feature`, `Master Page`, `Detail Page`, `EF Migration`, `Review Diff`, `Commit Msg`).
-9. **Token history**: bar chart of peak context for the last 12 conversations (hover for title, output tokens and steps).
+1. **Auto-Discovered MCP Servers + Real Disable**
+   - Reads servers dynamically from `~/.gemini/config/mcp_config.json` (plus `antigravity` / `antigravity-ide` configs) and loaded tool schemas under `~/.gemini/antigravity/mcp/`.
+   - **Status dots**: green = enabled & tools loaded, amber = enabled without local schemas, grey = disabled. Click a server name to inspect its tools.
+   - **Real unload/disable**: toggling a configured server OFF moves its definition to `~/.gemini/config/mcp_disabled.json` so it does not load or consume context window; toggling ON restores it cleanly.
+   - **`RO` / `RW` mode toggle**: automatically appears for database or tool servers with `env.READONLY` or `env.DB_READONLY` (e.g., `mssql`, `sqlite`).
+   - **Agent policy sync**: writes `<workspace>/.agents/rules/00-active-mcps.md` with `trigger: always_on` frontmatter so new agent sessions immediately know which MCP servers are active (and which ones to avoid).
 
-Sections are collapsible; the open/closed state is remembered.
+2. **Smart Workspace Detection & Switcher**
+   - Auto-detects the active project from your pinned workspace (`~/.gemini/config/hub_workspace.json`), working directory, or Antigravity's most recently used project in `~/.gemini/config/projects/`.
+   - Status bar shows `<project> @ <branch> (<N> chg)`, `graphify` knowledge graph age (if present), `Hooks ON/OFF` shortcut, and `Map` (`AGENTS.md` / `GEMINI.md` / `CLAUDE.md`) shortcut.
+   - Click the workspace name to switch target folders anytime via native folder picker.
 
-## Layout
+3. **Auto-Detected Project Actions**
+   - Automatically detects scripts and build commands for any repo:
+     - `package.json` scripts (`npm run dev`, `build`, `test`, `lint`, `typecheck`, ...)
+     - `.NET` (`dotnet build`, `dotnet test`)
+     - `Python` (`pytest`), `Rust` (`cargo test`), `Go` (`go test ./...`)
+     - `graphify` (`Update Graph` if `graphify-out/graph.json` exists)
+     - Custom project buttons via `<workspace>/.agents/hub.json` (see [`examples/hub.example.json`](./examples/hub.example.json))
 
-| Path | Purpose |
+4. **Quick Prompts**
+   - Universal one-click prompt starters (`Explain Codebase`, `Review Diff`, `Write Tests`, `Refactor`, `Fix Build / Lint`, `Commit Msg`), plus project-specific prompts from `.agents/hub.json`.
+
+5. **Rules & Skills Explorer**
+   - **Rules**: lists `.agents/rules/*.md` with trigger badges (`ALWAYS`, `COND`, `MANUAL`). Toggling off renames to `*.md.disabled` safely without deleting files.
+   - **Skills**: scans project (`.agents/skills`), global (`~/.gemini/config/skills`), and plugin (`~/.gemini/config/plugins/*/skills`) skills with live filtering and click-to-insert.
+
+6. **Context Usage & Token History**
+   - Live context usage bar for the latest conversation.
+   - Bar chart of peak context usage across your last 12 conversations (hover for title, output tokens, and step count).
+
+7. **Auto-Repatch After Updates (Windows)**
+   - Optional Windows Task Scheduler helper checks every 5 minutes (silently) and re-applies the patch after Antigravity updates once the app is closed.
+
+---
+
+## Requirements
+
+- **Node.js** 18+ on `PATH` (no `npm install` needed — zero external dependencies).
+- Antigravity desktop application installed (Windows, macOS, or Linux).
+
+---
+
+## Installation
+
+### Windows
+Double-click **`apply_patch.bat`** (or run from terminal):
+```bat
+apply_patch.bat
+```
+This closes Antigravity, backs up your original `app.asar` to `app.asar.bak`, injects and verifies the hub for your exact installed version, and relaunches Antigravity.
+
+To automatically re-apply after Antigravity updates (once):
+```bat
+install_autopatch.bat
+```
+To remove the scheduled task later:
+```bat
+install_autopatch.bat /remove
+```
+
+### macOS / Linux
+```bash
+chmod +x apply_patch.sh restore_original.sh
+./apply_patch.sh
+```
+
+### Manual / Custom Install Path
+```bash
+node src/build.js --install --resources "/path/to/Antigravity/resources"
+node src/verify.js
+```
+
+---
+
+## Customizing for Your Project (`.agents/hub.json`)
+
+Drop an optional `.agents/hub.json` into any repository to add project-specific CLI buttons and prompt starters (see [`examples/hub.example.json`](./examples/hub.example.json)):
+
+```json
+{
+  "actions": [
+    { "label": "Dev Server", "command": "npm run dev", "primary": true },
+    { "label": "Deploy Staging", "command": "./scripts/deploy-staging.sh", "confirm": true }
+  ],
+  "prompts": [
+    { "label": "Feature Spec", "text": "Read the relevant modules first and propose a minimal plan." }
+  ]
+}
+```
+
+---
+
+## Architecture
+
+| File | Purpose |
 | --- | --- |
-| `src/main-inject.js` | Main-process IPC handlers, injected into `dist/ipcHandlers.js` |
-| `src/preload-inject.js` | Renderer hub UI, appended to `dist/preload.js` |
-| `src/asar.js` | Dependency-free ASAR reader/writer (recomputes integrity hashes) |
-| `src/build.js` | Builds `app.asar` from the installed version; `--install` copies it in |
-| `src/verify.js` | Syntax check and byte comparison of untouched entries |
+| `src/asar.js` | Dependency-free ASAR reader/writer with SHA-256 block integrity recomputation |
+| `src/paths.js` | Cross-platform Antigravity `resources` directory discovery |
+| `src/main-inject.js` | Main-process IPC handlers injected into `dist/ipcHandlers.js` |
+| `src/preload-inject.js` | Collapsible Overview Hub UI injected into `dist/preload.js` |
+| `src/build.js` | Source-preserving patcher (`--install`, `--if-needed`, `--skip-if-running`, `--resources`) |
+| `src/verify.js` | Syntax check and byte-for-byte verification of all untouched ASAR entries |
+| `src/test-main.js` | Automated handler test suite running in an isolated temporary directory |
 
-## Apply
-
-Run `apply_patch.bat`. It closes Antigravity, builds the patch from the **currently installed** version (so updates never get downgraded), refreshes `app.asar.bak`, installs and relaunches.
-
-Antigravity auto-updates replace `app.asar`. Run `install_autopatch.bat` once to register the `AntigravityHubAutoRepatch` scheduled task: every 5 minutes it checks (hidden, via `auto_repatch.vbs`) whether the installed archive carries the current build hash and, if not and Antigravity is closed, re-applies the patch. Editing `src/*-inject.js` changes the build hash, so source changes are also picked up automatically. Log: `logs/auto_repatch.log`. Remove with `install_autopatch.bat /remove`.
-
-Run `node src/test-main.js` to exercise the main-process handlers against a temporary home directory.
+---
 
 ## Rollback
 
-Run `restore_original.bat` to restore `app.asar.bak`.
+- **Windows:** run `restore_original.bat`
+- **macOS / Linux:** run `./restore_original.sh`
+
+Both restore the untouched `app.asar.bak` created during installation.
+
+---
+
+## Disclaimer
+
+This tool modifies your local Electron `app.asar` bundle for personal productivity enhancements and is not affiliated with or endorsed by Google Antigravity. Always keep `app.asar.bak` intact for instant rollback.
+
+## License
+
+[MIT](./LICENSE)

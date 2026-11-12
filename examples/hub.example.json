@@ -1,0 +1,28 @@
+{
+  "actions": [
+    {
+      "label": "Dev Server",
+      "command": "npm run dev",
+      "primary": true
+    },
+    {
+      "label": "Run Tests",
+      "command": "npm test"
+    },
+    {
+      "label": "Deploy Staging",
+      "command": "./scripts/deploy-staging.sh",
+      "confirm": true
+    }
+  ],
+  "prompts": [
+    {
+      "label": "Feature Spec",
+      "text": "Read the relevant modules first, propose a minimal implementation plan, and list affected files."
+    },
+    {
+      "label": "Security Check",
+      "text": "Audit the recent changes for auth gaps, injection risks, and secret leakage."
+    }
+  ]
+}

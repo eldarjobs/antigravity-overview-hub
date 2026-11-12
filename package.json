@@ -1,0 +1,13 @@
+{
+  "name": "antigravity-overview-hub",
+  "version": "1.0.0",
+  "description": "Portable Overview Hub enhancement for the Antigravity desktop app: auto-discovered MCP controls, context bar, token history, rules/skills explorer, and project actions.",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "node src/build.js",
+    "install-patch": "node src/build.js --install",
+    "verify": "node src/verify.js",
+    "test": "node src/test-main.js"
+  }
+}

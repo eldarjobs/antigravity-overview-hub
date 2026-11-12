@@ -5,15 +5,13 @@
 const fs = require('fs');
 const path = require('path');
 const { readArchive, readEntry, writeArchive } = require('./asar');
+const { findResourcesDir } = require('./paths');
 
 const MARKER = 'AG_EXTENSION_HUB';
 const args = process.argv.slice(2);
 const resIdx = args.indexOf('--resources');
-const resDir = resIdx >= 0 ? args[resIdx + 1] : [
-    path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Antigravity', 'resources'),
-    path.join(process.env.ProgramFiles || '', 'Antigravity', 'resources'),
-].find(d => fs.existsSync(path.join(d, 'app.asar')));
-if (!resDir) { console.error('[ERROR] Antigravity resources directory not found.'); process.exit(1); }
+const resDir = findResourcesDir(resIdx >= 0 ? args[resIdx + 1] : null);
+if (!resDir) { console.error('[ERROR] Antigravity resources directory not found. Pass --resources <dir>.'); process.exit(1); }
 
 const installed = path.join(resDir, 'app.asar');
 const backup = path.join(resDir, 'app.asar.bak');
